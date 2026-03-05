@@ -1,0 +1,20 @@
+{
+  "net_worth_percentiles": [
+    { "percentile": 10, "net_worth": 1000000 },
+    { "percentile": 25, "net_worth": 5000000 },
+    { "percentile": 50, "net_worth": 15000000 },
+    { "percentile": 75, "net_worth": 40000000 },
+    { "percentile": 90, "net_worth": 120000000 },
+    { "percentile": 95, "net_worth": 200000000 },
+    { "percentile": 99, "net_worth": 400000000 }
+  ],
+  "salary_percentiles": [
+    { "percentile": 10, "salary": 800000 },
+    { "percentile": 25, "salary": 1200000 },
+    { "percentile": 50, "salary": 2000000 },
+    { "percentile": 75, "salary": 3000000 },
+    { "percentile": 90, "salary": 4500000 },
+    { "percentile": 95, "salary": 6000000 },
+    { "percentile": 99, "salary": 9000000 }
+  ]
+}

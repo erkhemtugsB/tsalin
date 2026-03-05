@@ -1,0 +1,36 @@
+<svg width="960" height="360" viewBox="0 0 960 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="360" rx="24" fill="#0B2A4D"/>
+  <path d="M0 250C120 220 220 280 340 250C470 215 550 170 690 210C790 240 860 230 960 205V360H0V250Z" fill="#123861"/>
+  <path d="M0 280C120 255 230 315 360 288C500 258 595 210 730 242C820 265 885 257 960 240V360H0V280Z" fill="#194876"/>
+
+  <g opacity="0.95">
+    <circle cx="160" cy="90" r="36" fill="#F8FAFC"/>
+    <path d="M143 90H177" stroke="#0B2A4D" stroke-width="5" stroke-linecap="round"/>
+    <path d="M160 73V107" stroke="#0B2A4D" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <g>
+    <rect x="560" y="124" width="88" height="160" rx="8" fill="#9FB3C8"/>
+    <rect x="660" y="96" width="120" height="188" rx="8" fill="#B7C7D8"/>
+    <rect x="800" y="140" width="64" height="144" rx="8" fill="#8EA4BD"/>
+    <rect x="590" y="150" width="14" height="14" fill="#E5ECF3"/>
+    <rect x="616" y="150" width="14" height="14" fill="#E5ECF3"/>
+    <rect x="590" y="176" width="14" height="14" fill="#E5ECF3"/>
+    <rect x="616" y="176" width="14" height="14" fill="#E5ECF3"/>
+    <rect x="690" y="124" width="16" height="16" fill="#ECF2F8"/>
+    <rect x="718" y="124" width="16" height="16" fill="#ECF2F8"/>
+    <rect x="746" y="124" width="16" height="16" fill="#ECF2F8"/>
+    <rect x="690" y="152" width="16" height="16" fill="#ECF2F8"/>
+    <rect x="718" y="152" width="16" height="16" fill="#ECF2F8"/>
+    <rect x="746" y="152" width="16" height="16" fill="#ECF2F8"/>
+  </g>
+
+  <g>
+    <rect x="108" y="198" width="222" height="86" rx="12" fill="#F8FAFC"/>
+    <path d="M136 240H300" stroke="#B8C7D8" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="145" cy="230" r="12" fill="#0B2A4D"/>
+    <path d="M188 219C188 209.611 195.611 202 205 202H272C281.389 202 289 209.611 289 219V240H188V219Z" fill="#DDE7F1"/>
+  </g>
+
+  <text x="118" y="92" fill="#0B2A4D" font-family="Segoe UI, Arial" font-size="30" font-weight="700">₮</text>
+</svg>

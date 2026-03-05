@@ -31,7 +31,9 @@ export default function ShareButton({ score, ageBracket }) {
   const encodedText = encodeURIComponent(shareMessage);
   const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`;
   const telegramShareUrl = `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;
+  const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
   const whatsappShareUrl = `https://wa.me/?text=${encodeURIComponent(`${shareMessage} ${shareUrl}`)}`;
+  const isLocalhost = typeof window !== "undefined" && window.location.hostname.includes("localhost");
 
   return (
     <section className="w-full rounded-xl border border-slate-200 bg-white p-4">
@@ -85,6 +87,14 @@ export default function ShareButton({ score, ageBracket }) {
           Telegram
         </a>
         <a
+          href={twitterShareUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-navy-900 hover:bg-slate-50"
+        >
+          Twitter/X
+        </a>
+        <a
           href={whatsappShareUrl}
           target="_blank"
           rel="noreferrer"
@@ -93,6 +103,13 @@ export default function ShareButton({ score, ageBracket }) {
           WhatsApp
         </a>
       </div>
+
+      {isLocalhost && (
+        <p className="mt-3 text-xs text-amber-700">
+          Анхаар: localhost холбоосыг Facebook/Twitter гаднаас нээж чаддаггүй. Deploy хийсэн домэйн дээр
+          share хамгийн зөв ажиллана.
+        </p>
+      )}
     </section>
   );
 }

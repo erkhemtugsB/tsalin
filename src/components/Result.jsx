@@ -28,17 +28,20 @@ function MongoliaPercentMap({ percent }) {
   const mapVisibleStart = 5; // %
   const mapVisibleEnd = 82; // %
   const visibleWidth = mapVisibleEnd - mapVisibleStart;
-  const dynamicRightInset = 100 - (mapVisibleStart + (safePercent / 100) * visibleWidth);
+  const dynamicRightInset = Math.max(
+    100 - mapVisibleEnd,
+    100 - (mapVisibleStart + (safePercent / 100) * visibleWidth)
+  );
 
   return (
-    <div className="rounded-xl bg-white/10 p-3">
-      <div className="flex items-center justify-between text-xs text-slate-200/90">
+    <div className="rounded-xl bg-white/10 p-2 sm:p-3">
+      <div className="flex items-center justify-between text-[11px] text-slate-200/90 sm:text-xs">
         <span>Монголын газрын зургийн дүүрэлт</span>
         <span>{safePercent}%</span>
       </div>
 
-      <div className="relative mt-2 w-full rounded-lg border border-white/20 bg-white/5 p-1 md:p-2">
-        <div className="relative h-40 w-full md:h-52">
+      <div className="relative mt-2 w-full overflow-hidden rounded-lg border border-white/20 bg-white/5 p-1 sm:p-1.5 md:p-2">
+        <div className="relative h-28 w-full sm:h-36 md:h-52">
           <img
             src={mapImageUrl}
             alt="Монгол газрын зураг"
@@ -123,20 +126,20 @@ function PieBreakdown({ items, total }) {
 
 function ComparisonSection({ percentile }) {
   const richerThan = Math.round(percentile);
-  const iconCount = 20;
+  const iconCount = 10;
   const filledIcons = Math.round((richerThan / 100) * iconCount);
 
   return (
     <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-navy-900">Бусадтай харьцуулалт</h3>
       <div className="mt-3">
-        <p className="text-xs text-slate-500">20 хүний төлөөлөл ({richerThan}%)</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="text-xs text-slate-500">10 хүний төлөөлөл ({richerThan}%)</p>
+        <div className="mt-2 flex flex-wrap items-center gap-0.5">
           {Array.from({ length: iconCount }).map((_, i) => (
             <svg
               key={i}
               viewBox="0 0 24 24"
-              className={`h-8 w-8 ${i < filledIcons ? "text-cyan-500" : "text-slate-400"}`}
+              className={`h-10 w-10 ${i < filledIcons ? "text-cyan-500" : "text-slate-400"}`}
               fill="currentColor"
               aria-hidden="true"
             >
@@ -229,6 +232,7 @@ export default function Result({
   }, [payload, netWorth]);
 
   const selected = breakdown.find((item) => item.key === selectedKey) || breakdown[0];
+  const pieItems = breakdown.filter((item) => item.key !== "salary");
   const ageBracket = getAgeBracket(payload?.nas);
 
   return (
@@ -263,7 +267,7 @@ export default function Result({
         <p className="mt-1 text-2xl font-bold text-navy-900">{formatMnt(netWorth)}₮</p>
       </div>
 
-      <PieBreakdown items={breakdown} total={netWorth} />
+      <PieBreakdown items={pieItems} total={netWorth} />
       <ComparisonSection percentile={percentile} />
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">

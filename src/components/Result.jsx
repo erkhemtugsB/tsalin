@@ -74,7 +74,7 @@ function PieBreakdown({ items, total }) {
 
   return (
     <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-      <p className="text-sm font-semibold text-navy-900">Хөрөнгийн бүтэц (Pie chart)</p>
+      <p className="text-sm font-semibold text-navy-900">Хөрөнгийн бүтэц (дугуй диаграм)</p>
       <div className="mt-3 grid items-center gap-4 md:grid-cols-[auto_1fr]">
         <svg viewBox="0 0 128 128" className="h-36 w-36">
           <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#e2e8f0" strokeWidth="20" />
@@ -131,9 +131,9 @@ function ComparisonSection({ percentile }) {
 
   return (
     <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-navy-900">Бусадтай харьцуулалт</h3>
+      <h3 className="text-sm font-semibold text-navy-900">Статистик харьцуулалт</h3>
       <div className="mt-3">
-        <p className="text-xs text-slate-500">10 хүний төлөөлөл ({richerThan}%)</p>
+        <p className="text-xs text-slate-500">10 нэгжийн загварчилсан харьцуулалт ({richerThan}%)</p>
         <div className="mt-2 flex flex-wrap items-center gap-0.5">
           {Array.from({ length: iconCount }).map((_, i) => (
             <svg
@@ -241,9 +241,9 @@ export default function Result({
         compact ? "p-4 md:p-5" : "mt-8 p-6"
       }`}
     >
-      <h2 className="text-xl font-semibold text-navy-900">Таны үр дүн</h2>
+      <h2 className="text-xl font-semibold text-navy-900">Таны санхүүгийн дүн шинжилгээ</h2>
       <p className="mt-2 text-sm text-slate-600">
-        Маягт амжилттай илгээгдлээ. Доорх дүн таны оруулсан мэдээлэл дээр суурилсан.
+        Доорх тайлан нь таны оруулсан мэдээлэлд тулгуурласан статистик үнэлгээ болно.
       </p>
 
       {infoMessage && (
@@ -251,8 +251,10 @@ export default function Result({
       )}
 
       <div className="mt-5 rounded-xl bg-navy-900 p-5 text-white">
-        <p className="text-sm text-slate-200">Харьцуулсан түвшин (хөрөнгийн дүнгээр)</p>
-        <p className="mt-1 text-3xl font-bold md:text-4xl">Та Монголчуудын {animatedPercent}% –иас баян</p>
+        <p className="text-sm text-slate-200">Статистик байрлал (хөрөнгийн дүнгээр)</p>
+        <p className="mt-1 text-3xl font-bold md:text-4xl">
+          Та Монголын статистик дундажийн {animatedPercent}% –иас дээгүүр түвшинд байна
+        </p>
         <div className="mt-4">
           <MongoliaPercentMap percent={animatedPercent} />
         </div>
@@ -263,7 +265,7 @@ export default function Result({
       </div>
 
       <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-        <p className="text-sm text-slate-500">Таны нийт үнэлгээ</p>
+        <p className="text-sm text-slate-500">Таны тооцоолсон нийт хөрөнгө</p>
         <p className="mt-1 text-2xl font-bold text-navy-900">{formatMnt(netWorth)}₮</p>
       </div>
 
@@ -285,14 +287,14 @@ export default function Result({
             <p className="text-sm">{item.label}</p>
             <p className="mt-1 text-lg font-semibold">{formatMnt(item.value)}₮</p>
             <p className={`mt-1 text-xs ${selectedKey === item.key ? "text-slate-200" : "text-slate-500"}`}>
-              Нийтийн {item.percent}%
+              Нийт бүтцийн {item.percent}%
             </p>
           </button>
         ))}
       </div>
 
       <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm text-slate-600">Сонгосон үзүүлэлт</p>
+        <p className="text-sm text-slate-600">Сонгосон санхүүгийн үзүүлэлт</p>
         <p className="mt-1 text-base font-semibold text-navy-900">
           {selected.label}: {formatMnt(selected.value)}₮ ({selected.percent}%)
         </p>

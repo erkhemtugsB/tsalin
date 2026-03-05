@@ -17,7 +17,9 @@ export default function ShareButton({ score, ageBracket }) {
   // Nickname байхгүй бол мессежэнд автоматаар алгасна.
   const shareMessage = useMemo(() => {
     const nickPrefix = nickname.trim() ? `${nickname.trim()}, ` : "";
-    return `${nickPrefix}та Монголчуудын ${Math.round(score || 0)}% –иас баян байна 🇲🇳`;
+    return `${nickPrefix}таны санхүүгийн үзүүлэлт Монголын статистик дундажийн ${Math.round(
+      score || 0
+    )}% –иас дээгүүр байна 🇲🇳`;
   }, [nickname, score]);
 
   const handleCopy = async () => {
@@ -37,7 +39,7 @@ export default function ShareButton({ score, ageBracket }) {
 
   return (
     <section className="w-full rounded-xl border border-slate-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-navy-900">Хуваалцах</h3>
+      <h3 className="text-sm font-semibold text-navy-900">Тайлан хуваалцах</h3>
 
       <div className="mt-3">
         <label className="mb-1 block text-xs text-slate-600">Нэр хоч (заавал биш)</label>

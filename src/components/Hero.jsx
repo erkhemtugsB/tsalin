@@ -6,13 +6,14 @@ export default function Hero({ children }) {
         <div className="pointer-events-none absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-sky-300/10 blur-2xl" />
         <div className="relative">
           <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-slate-100">
-            Монгол Улсын хөрөнгийн ойролцоо үнэлгээ
+            Монгол Улсын санхүүгийн статистик үнэлгээ
           </p>
           <h1 className="mt-3 text-2xl font-bold leading-tight md:text-3xl">
-            Хөрөнгөө 30 секундэд тооцоолоод, Монголчуудын дунд хаана яваагаа хараарай
+            Санхүүгийн үзүүлэлтээ 30 секундэд тооцоолж, статистик түвшнээ хараарай
           </h1>
           <p className="mt-3 max-w-xl text-sm text-slate-200">
-            Зөвхөн цалин, машин, байрны үнээ оруулна. Таны мэдээллээр шууд хувь тооцоолж харуулна.
+            Цалин, хуримтлал, автомашин, үл хөдлөх хөрөнгийн дүнгээр таны мэдээллийн дүн шинжилгээг
+            статистик жишигтэй харьцуулан харуулна.
           </p>
 
           <div className="relative mt-4 w-full max-w-xl overflow-hidden rounded-xl border border-white/20 shadow-[0_20px_45px_rgba(0,0,0,0.35)]">
@@ -35,11 +36,11 @@ export default function Hero({ children }) {
             </div>
             <div className="rounded-lg bg-white/10 p-2">
               <p className="text-slate-200">2 алхам</p>
-              <p className="mt-1 font-semibold text-white">Хувь тооцоолох</p>
+              <p className="mt-1 font-semibold text-white">Статистик тооцоолол</p>
             </div>
             <div className="rounded-lg bg-white/10 p-2">
               <p className="text-slate-200">3 алхам</p>
-              <p className="mt-1 font-semibold text-white">Үр дүн хуваалцах</p>
+              <p className="mt-1 font-semibold text-white">Тайлан хуваалцах</p>
             </div>
           </div>
         </div>

@@ -7,16 +7,16 @@ export default function Share() {
   const nick = params.get("nick");
 
   const prefix = nick ? `${nick}, ` : "";
-  const message = `${prefix}та Монголчуудын ${score}% –иас баян байна 🇲🇳`;
+  const message = `${prefix}таны санхүүгийн үзүүлэлт Монголын статистик дундажийн ${score}% –иас дээгүүр байна 🇲🇳`;
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-      <h1 className="text-2xl font-bold text-navy-900">Хуваалцсан үр дүн</h1>
+      <h1 className="text-2xl font-bold text-navy-900">Хуваалцсан санхүүгийн тайлан</h1>
       <p className="mt-4 rounded-xl bg-white p-4 text-lg font-medium text-navy-900">{message}</p>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <div className="rounded-lg bg-white p-3">
-          <p className="text-xs text-slate-500">Хувь (score)</p>
+          <p className="text-xs text-slate-500">Статистик хувь (score)</p>
           <p className="text-base font-semibold text-navy-900">{score}%</p>
         </div>
         {age && (

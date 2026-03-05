@@ -9,8 +9,8 @@ export default function App() {
       <header className="border-b border-slate-200 bg-navy-900 text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
           <Link to="/" className="group">
-            <span className="block text-2xl font-black lowercase tracking-tight text-[#0CAA41] transition group-hover:text-[#14b84c]">
-              sankhuu
+            <span className="block text-xl font-black tracking-tight text-white transition group-hover:text-slate-100 md:text-2xl">
+              Монголын хөрөнгийн тооцоолуур
             </span>
           </Link>
           <nav className="flex gap-4 text-sm">

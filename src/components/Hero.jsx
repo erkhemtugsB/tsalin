@@ -17,7 +17,7 @@ export default function Hero({ children }) {
 
           <div className="relative mt-4 w-full max-w-xl overflow-hidden rounded-xl border border-white/20 shadow-[0_20px_45px_rgba(0,0,0,0.35)]">
             <img
-              src="https://www.youngpioneertours.com/wp-content/uploads/2020/04/About-Ulaanbaatar.jpeg"
+              src="/hero.png"
               alt="Улаанбаатар хотын зураг"
               className="h-48 w-full object-cover saturate-110 md:h-56"
             />

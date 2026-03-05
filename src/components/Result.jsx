@@ -122,19 +122,20 @@ function PieBreakdown({ items, total }) {
 function ComparisonSection({ percentile }) {
   const richerThan = Math.round(percentile);
   const iconCount = 10;
-  const filledIcons = Math.round((richerThan / 100) * iconCount);
+  const topPercent = Math.max(1, 100 - richerThan);
+  const highlightedIcons = Math.max(1, Math.round((topPercent / 100) * iconCount));
 
   return (
     <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
       <h3 className="text-sm font-semibold text-navy-900">Статистик харьцуулалт</h3>
       <div className="mt-3">
-        <p className="text-xs text-slate-500">10 нэгжийн загварчилсан харьцуулалт ({richerThan}%)</p>
+        <p className="text-xs text-slate-500">10 нэгжийн загварчилсан харьцуулалт (Top {topPercent}%)</p>
         <div className="mt-2 flex flex-wrap items-center gap-0.5">
           {Array.from({ length: iconCount }).map((_, i) => (
             <svg
               key={i}
               viewBox="0 0 24 24"
-              className={`h-10 w-10 ${i < filledIcons ? "text-cyan-500" : "text-slate-400"}`}
+              className={`h-10 w-10 ${i < highlightedIcons ? "text-cyan-500" : "text-slate-400"}`}
               fill="currentColor"
               aria-hidden="true"
             >

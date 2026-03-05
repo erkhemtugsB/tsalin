@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
+import { inappropriateWords } from "../data/lists";
+
+const mongolianNicknameRegex = /^[А-ЯӨҮЁа-яөүё\s\-]+$/;
 
 export default function ShareButton({ score, ageBracket }) {
   const [nickname, setNickname] = useState("");
   const [copied, setCopied] = useState(false);
+  const [nickError, setNickError] = useState("");
 
   // URL үүсгэх логик: score-ийг заавал оруулж, age болон nickname байгаа үед query-д нэмнэ.
   const shareUrl = useMemo(() => {
@@ -21,6 +25,21 @@ export default function ShareButton({ score, ageBracket }) {
       score || 0
     )}% –иас дээгүүр байна 🇲🇳`;
   }, [nickname, score]);
+
+  const handleNicknameChange = (value) => {
+    const safe = value.replace(/[^А-ЯӨҮЁа-яөүё\s\-]/g, "");
+    setNickname(safe);
+    const normalized = safe.toLowerCase().trim();
+    if (normalized && !mongolianNicknameRegex.test(normalized)) {
+      setNickError("Нэр хоч зөвхөн Монгол кирилл үсгээр бичигдэнэ.");
+      return;
+    }
+    if (inappropriateWords.some((w) => normalized.includes(w))) {
+      setNickError("Нэр хоч талбарт зохисгүй үг ашиглах боломжгүй.");
+      return;
+    }
+    setNickError("");
+  };
 
   const handleCopy = async () => {
     // Clipboard API ашиглан share URL-г copy хийнэ.
@@ -46,10 +65,11 @@ export default function ShareButton({ score, ageBracket }) {
         <input
           type="text"
           value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
+          onChange={(e) => handleNicknameChange(e.target.value)}
           placeholder="Жишээ: Бат"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-navy-800"
         />
+        {nickError && <p className="mt-1 text-xs text-red-600">{nickError}</p>}
       </div>
 
       <div className="mt-3">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { calculateNetWorth, calculatePercentile } from "../utils/calculator";
+import { companyOptions, inappropriateWords, professionOptions } from "../data/lists";
 
 const AGE_MIN = 15;
 const AGE_MAX = 100;
@@ -12,6 +13,7 @@ const HOME_MIN = 0;
 const HOME_MAX = 1000000000;
 const SAVINGS_MIN = 0;
 const RATE_LIMIT_MS = 30000;
+const mongolianTextRegex = /^[А-ЯӨҮЁа-яөүё\s.,()\-]+$/;
 
 const initialForm = {
   nas: "",
@@ -41,6 +43,17 @@ function parseMoney(value) {
 
 function isInRange(value, min, max) {
   return Number.isFinite(value) && value >= min && value <= max;
+}
+
+function isValidMongolianText(value) {
+  const trimmed = (value || "").trim();
+  if (!trimmed) return false;
+  return mongolianTextRegex.test(trimmed);
+}
+
+function hasInappropriateWord(value) {
+  const normalized = (value || "").toLowerCase().trim();
+  return inappropriateWords.some((word) => normalized.includes(word));
 }
 
 async function getClientMeta() {
@@ -96,6 +109,18 @@ function createSubmissionSignature(payload) {
 function validatePayload(payload) {
   const errors = {};
 
+  if (!isValidMongolianText(payload.alban)) {
+    errors.alban = "Албан тушаал зөвхөн Монгол кирилл үсгээр бичигдсэн байна.";
+  } else if (hasInappropriateWord(payload.alban)) {
+    errors.alban = "Албан тушаал талбарт зохисгүй үг ашиглах боломжгүй.";
+  }
+
+  if (!isValidMongolianText(payload.company)) {
+    errors.company = "Компани зөвхөн Монгол кирилл үсгээр бичигдсэн байна.";
+  } else if (hasInappropriateWord(payload.company)) {
+    errors.company = "Компани талбарт зохисгүй үг ашиглах боломжгүй.";
+  }
+
   if (!Number.isInteger(payload.nas) || !isInRange(payload.nas, AGE_MIN, AGE_MAX)) {
     errors.nas = `Нас ${AGE_MIN}-${AGE_MAX} хооронд бүхэл тоо байна.`;
   }
@@ -121,6 +146,43 @@ function validatePayload(payload) {
 
 const salaryQuickValues = ["1200000", "2000000", "3500000", "5000000"];
 
+function SearchableDropdownInput({ name, value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const filtered = options
+    .filter((item) => item.toLowerCase().includes((value || "").toLowerCase()))
+    .slice(0, 8);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        name={name}
+        value={value}
+        onChange={onChange}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none placeholder:text-slate-400 focus:border-navy-800"
+      />
+
+      {open && filtered.length > 0 && (
+        <div className="absolute z-20 mt-1 max-h-52 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+          {filtered.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onMouseDown={() => onChange({ target: { name, value: option } })}
+              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Form({ onCalculated, compact = false }) {
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
@@ -129,6 +191,11 @@ export default function Form({ onCalculated, compact = false }) {
 
   const handleTextChange = (e) => {
     const { name, value } = e.target;
+    if (name === "alban" || name === "company") {
+      const safeCharsOnly = value.replace(/[^А-ЯӨҮЁа-яөүё\s.,()\-]/g, "");
+      setForm((prev) => ({ ...prev, [name]: safeCharsOnly }));
+      return;
+    }
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -328,29 +395,29 @@ export default function Form({ onCalculated, compact = false }) {
 
         <div>
           <label className="mb-1 block text-sm font-medium">Албан тушаал</label>
-          <input
-            type="text"
+          <SearchableDropdownInput
             name="alban"
             value={form.alban}
             onChange={handleTextChange}
-            required
-            placeholder="Жишээ: Ахлах инженер"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none placeholder:text-slate-400 focus:border-navy-800"
+            options={professionOptions}
+            placeholder="Хайх эсвэл өөрөө бичих"
           />
+          <p className={hintClass}>Зөвхөн Монгол кирилл үсэг ашиглана.</p>
+          {errors.alban && <p className={errorClass}>{errors.alban}</p>}
         </div>
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium">Компани</label>
-        <input
-          type="text"
+        <SearchableDropdownInput
           name="company"
           value={form.company}
           onChange={handleTextChange}
-          required
-          placeholder="Жишээ: Tech LLC"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none placeholder:text-slate-400 focus:border-navy-800"
+          options={companyOptions}
+          placeholder="Хайх эсвэл өөрөө бичих"
         />
+        <p className={hintClass}>Зөвхөн Монгол кирилл үсэг ашиглана.</p>
+        {errors.company && <p className={errorClass}>{errors.company}</p>}
       </div>
 
       <div className="rounded-xl border border-slate-200 p-3">

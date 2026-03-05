@@ -35,11 +35,6 @@ function MongoliaPercentMap({ percent }) {
 
   return (
     <div className="rounded-xl bg-white/10 p-2 sm:p-3">
-      <div className="flex items-center justify-between text-[11px] text-slate-200/90 sm:text-xs">
-        <span>Монголын газрын зургийн дүүрэлт</span>
-        <span>{safePercent}%</span>
-      </div>
-
       <div className="relative mt-2 w-full overflow-hidden rounded-lg border border-white/20 bg-white/5 p-1 sm:p-1.5 md:p-2">
         <div className="relative h-28 w-full sm:h-36 md:h-52">
           <img

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 const PAGE_SIZE = 50;
-const DEFAULT_LIMIT = PAGE_SIZE;
+const DEFAULT_LIMIT = 500;
 
 function normalizeText(value) {
   return (value || "").toString().trim();
@@ -39,31 +39,44 @@ function parseSalaryText(raw) {
     return { min: null, max: null, avg: null };
   }
 
-  const multiplier = text.includes("сая") ? 1_000_000 : 1;
-  const tokens = text.match(/\d[\d\s.,]*/g) || [];
-  const values = [];
+  const parseSide = (chunk) => {
+    const million = chunk.match(/(\d+(?:[.,]\d+)?)\s*сая/);
+    const thousand = chunk.match(/(\d+(?:[.,]\d+)?)\s*мянга/);
+    if (million || thousand) {
+      const millionValue = million ? Number(million[1].replace(",", ".")) * 1_000_000 : 0;
+      const thousandValue = thousand ? Number(thousand[1].replace(",", ".")) * 1_000 : 0;
+      const total = millionValue + thousandValue;
+      return Number.isFinite(total) && total > 0 ? total : null;
+    }
 
-  for (const token of tokens) {
-    const cleaned = token.replace(/[^\d.,]/g, "").trim();
-    if (!cleaned) continue;
-    let compact = cleaned.replace(/\s+/g, "");
-    if (compact.includes(",") && compact.includes(".")) {
-      compact = compact.replace(/,/g, "");
-    } else if (compact.includes(",") && !compact.includes(".")) {
-      const parts = compact.split(",");
-      if (parts[1]?.length <= 2) {
-        compact = `${parts[0]}.${parts[1]}`;
+    const multiplier = chunk.includes("сая") ? 1_000_000 : chunk.includes("мянга") ? 1_000 : 1;
+    const tokens = chunk.match(/\d[\d\s.,]*/g) || [];
+    for (const token of tokens) {
+      const cleaned = token.replace(/[^\d.,]/g, "").trim();
+      if (!cleaned) continue;
+      let compact = cleaned.replace(/\s+/g, "");
+      if (compact.includes(",") && compact.includes(".")) {
+        compact = compact.replace(/,/g, "");
+      } else if (compact.includes(",") && !compact.includes(".")) {
+        const parts = compact.split(",");
+        if (parts[1]?.length <= 2) {
+          compact = `${parts[0]}.${parts[1]}`;
+        } else {
+          compact = compact.replace(/,/g, "");
+        }
       } else {
         compact = compact.replace(/,/g, "");
       }
-    } else {
-      compact = compact.replace(/,/g, "");
+      const num = Number(compact);
+      if (Number.isFinite(num)) {
+        return num * multiplier;
+      }
     }
-    const num = Number(compact);
-    if (Number.isFinite(num)) {
-      values.push(num * multiplier);
-    }
-  }
+    return null;
+  };
+
+  const parts = text.split(/\s*[-–—]\s*/g);
+  const values = parts.map(parseSide).filter((v) => Number.isFinite(v));
 
   if (!values.length) {
     return { min: null, max: null, avg: null };
@@ -80,8 +93,7 @@ export default function Info() {
   const [sort, setSort] = useState("avg_desc");
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -105,7 +117,7 @@ export default function Info() {
       setError("");
 
       try {
-        const queryLimit = trimmedQuery ? Math.max(page * PAGE_SIZE, PAGE_SIZE) : DEFAULT_LIMIT;
+        const queryLimit = trimmedQuery ? DEFAULT_LIMIT : DEFAULT_LIMIT;
         const base = supabase.from("jobs");
         let builder = base
           .select("job_title, company_name, salary, location, source, job_url, scraped_at", { count: "exact" })
@@ -130,12 +142,16 @@ export default function Info() {
           throw fetchError;
         }
 
-        setRows(data || []);
-        if (Number.isFinite(count)) {
-          setHasMore((data || []).length < count);
-        } else {
-          setHasMore(false);
-        }
+        setRows(() => {
+          const merged = data || [];
+          const seen = new Set();
+          return merged.filter((item) => {
+            const key = item.job_url || `${item.company_name}-${item.job_title}-${item.scraped_at}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        });
         if (trimmedQuery) {
           const { count: totalCount, error: totalError } = await base.select("id", {
             count: "exact",
@@ -158,7 +174,6 @@ export default function Info() {
         setError(err?.message || "Мэдээлэл татахад алдаа гарлаа.");
         setRows([]);
         setMeta({ total: null, filtered: null });
-        setHasMore(false);
       } finally {
         if (active && currentRequest === requestId.current) {
           setLoading(false);
@@ -170,7 +185,7 @@ export default function Info() {
       active = false;
       clearTimeout(timer);
     };
-  }, [trimmedQuery, mode, page]);
+  }, [trimmedQuery, mode]);
 
   useEffect(() => {
     if (!supabase) {
@@ -218,6 +233,7 @@ export default function Info() {
 
   useEffect(() => {
     setSort("avg_desc");
+    setVisibleCount(PAGE_SIZE);
   }, [mode]);
 
   const listings = useMemo(() => {
@@ -330,6 +346,18 @@ export default function Info() {
     return cloned;
   }, [companies, sort]);
 
+  const visibleListings = useMemo(() => {
+    return sortedListings.slice(0, visibleCount);
+  }, [sortedListings, visibleCount]);
+
+  const visibleCompanies = useMemo(() => {
+    return sortedCompanies.slice(0, visibleCount);
+  }, [sortedCompanies, visibleCount]);
+
+  const hasMore = useMemo(() => {
+    return mode === "company" ? visibleCompanies.length < sortedCompanies.length : visibleListings.length < sortedListings.length;
+  }, [mode, visibleCompanies.length, visibleListings.length, sortedCompanies.length, sortedListings.length]);
+
   const summary = useMemo(() => {
     const salaryValues = listings
       .map((row) => row.salaryAvg)
@@ -358,6 +386,14 @@ export default function Info() {
           Компанийн нэр эсвэл ажлын байрны нэрээр хайж, цалин, дундаж болон эрэмбэлсэн жагсаалтыг
           хараарай.
         </p>
+        <div className="mt-5 overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-r from-amber-100/60 via-white to-slate-100/60 shadow-sm">
+          <img
+            src="/info-hero.png"
+            alt="Job intelligence"
+            className="h-36 w-full object-cover object-center opacity-90 md:h-48"
+          />
+        </div>
+        <p className="mt-3 text-xs text-slate-500">Сүүлийн зарууд дээр тулгуурласан дундаж үзүүлэлт.</p>
       </header>
 
       <div className="relative z-30 mt-6 grid gap-4 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-md md:grid-cols-[2fr,1fr]">
@@ -369,7 +405,7 @@ export default function Info() {
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
-                setPage(1);
+                setVisibleCount(PAGE_SIZE);
               }}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => {
@@ -387,7 +423,7 @@ export default function Info() {
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => {
                         setQuery(item);
-                        setPage(1);
+                setVisibleCount(PAGE_SIZE);
                         setShowSuggestions(false);
                       }}
                       className="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
@@ -563,7 +599,7 @@ export default function Info() {
               </div>
             </div>
           ) : (
-            sortedListings.map((item) => (
+            visibleListings.map((item) => (
               <article
                 key={`${item.job_url}-${item.companyLabel}`}
                 className="rounded-3xl border border-white/60 bg-white/80 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
@@ -573,7 +609,7 @@ export default function Info() {
                     <h3 className="text-lg font-bold text-navy-900">{item.titleLabel}</h3>
                     <p className="mt-1 text-sm text-slate-600">{item.companyLabel}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <div className="flex h-24 w-56 flex-col justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Цалин</p>
                     <p className="mt-1 text-base font-semibold text-navy-900">
                       {item.salaryMin || item.salaryMax
@@ -603,7 +639,7 @@ export default function Info() {
               </div>
             </div>
           ) : (
-            sortedCompanies.map((company) => (
+            visibleCompanies.map((company) => (
               <Link
                 key={company.company}
                 to={`/company/${encodeURIComponent(company.company)}`}
@@ -624,7 +660,7 @@ export default function Info() {
                       ))}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <div className="flex h-24 w-56 flex-col justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Цалингийн хүрээ</p>
                     <p className="mt-1 text-base font-semibold text-navy-900">
                       {company.salaryMin || company.salaryMax
@@ -644,7 +680,7 @@ export default function Info() {
         <div className="relative z-10 mt-6 flex justify-center">
           <button
             type="button"
-            onClick={() => setPage((prev) => prev + 1)}
+            onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
             className="rounded-full border border-slate-200 bg-white/80 px-5 py-2 text-sm font-semibold text-navy-900 shadow-sm hover:bg-white"
           >
             Илүү харах

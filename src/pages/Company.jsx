@@ -38,31 +38,44 @@ function parseSalaryText(raw) {
     return { min: null, max: null, avg: null };
   }
 
-  const multiplier = text.includes("сая") ? 1_000_000 : 1;
-  const tokens = text.match(/\\d[\\d\\s.,]*/g) || [];
-  const values = [];
+  const parseSide = (chunk) => {
+    const million = chunk.match(/(\\d+(?:[.,]\\d+)?)\\s*сая/);
+    const thousand = chunk.match(/(\\d+(?:[.,]\\d+)?)\\s*мянга/);
+    if (million || thousand) {
+      const millionValue = million ? Number(million[1].replace(",", ".")) * 1_000_000 : 0;
+      const thousandValue = thousand ? Number(thousand[1].replace(",", ".")) * 1_000 : 0;
+      const total = millionValue + thousandValue;
+      return Number.isFinite(total) && total > 0 ? total : null;
+    }
 
-  for (const token of tokens) {
-    const cleaned = token.replace(/[^\\d.,]/g, "").trim();
-    if (!cleaned) continue;
-    let compact = cleaned.replace(/\\s+/g, "");
-    if (compact.includes(",") && compact.includes(".")) {
-      compact = compact.replace(/,/g, "");
-    } else if (compact.includes(",") && !compact.includes(".")) {
-      const parts = compact.split(",");
-      if (parts[1]?.length <= 2) {
-        compact = `${parts[0]}.${parts[1]}`;
+    const multiplier = chunk.includes("сая") ? 1_000_000 : chunk.includes("мянга") ? 1_000 : 1;
+    const tokens = chunk.match(/\\d[\\d\\s.,]*/g) || [];
+    for (const token of tokens) {
+      const cleaned = token.replace(/[^\\d.,]/g, "").trim();
+      if (!cleaned) continue;
+      let compact = cleaned.replace(/\\s+/g, "");
+      if (compact.includes(",") && compact.includes(".")) {
+        compact = compact.replace(/,/g, "");
+      } else if (compact.includes(",") && !compact.includes(".")) {
+        const parts = compact.split(",");
+        if (parts[1]?.length <= 2) {
+          compact = `${parts[0]}.${parts[1]}`;
+        } else {
+          compact = compact.replace(/,/g, "");
+        }
       } else {
         compact = compact.replace(/,/g, "");
       }
-    } else {
-      compact = compact.replace(/,/g, "");
+      const num = Number(compact);
+      if (Number.isFinite(num)) {
+        return num * multiplier;
+      }
     }
-    const num = Number(compact);
-    if (Number.isFinite(num)) {
-      values.push(num * multiplier);
-    }
-  }
+    return null;
+  };
+
+  const parts = text.split(/\\s*[-–—]\\s*/g);
+  const values = parts.map(parseSide).filter((v) => Number.isFinite(v));
 
   if (!values.length) {
     return { min: null, max: null, avg: null };
@@ -154,6 +167,29 @@ export default function Company() {
       minSalary: min,
       maxSalary: max,
     };
+  }, [listings]);
+
+  const salaryBins = useMemo(() => {
+    const values = listings
+      .map((row) => row.salaryAvg)
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b);
+    if (!values.length) {
+      return [];
+    }
+    const min = values[0];
+    const max = values[values.length - 1];
+    const binCount = 6;
+    const step = (max - min) / binCount || 1;
+    const bins = Array.from({ length: binCount }, (_, i) => ({
+      label: `${formatSalary(Math.round(min + step * i))}`,
+      count: 0,
+    }));
+    for (const value of values) {
+      const idx = Math.min(Math.floor((value - min) / step), binCount - 1);
+      bins[idx].count += 1;
+    }
+    return bins;
   }, [listings]);
 
   const roleStats = useMemo(() => {
@@ -274,6 +310,37 @@ export default function Company() {
             </div>
           )}
 
+          <div className="rounded-3xl border border-white/60 bg-white/80 p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Цалингийн тархалт
+              </h2>
+              <span className="text-xs text-slate-400">Нийт зар</span>
+            </div>
+            {salaryBins.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">Цалингийн мэдээлэл олдсонгүй.</p>
+            ) : (
+              <div className="mt-4 grid gap-2">
+                {salaryBins.map((bin) => {
+                  const maxCount = Math.max(...salaryBins.map((b) => b.count));
+                  const width = maxCount ? Math.round((bin.count / maxCount) * 100) : 0;
+                  return (
+                    <div key={bin.label} className="flex items-center gap-3">
+                      <span className="w-28 text-xs text-slate-500">{bin.label}</span>
+                      <div className="flex-1 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-2 rounded-full bg-amber-400/80"
+                          style={{ width: `${width}%` }}
+                        />
+                      </div>
+                      <span className="w-10 text-right text-xs text-slate-500">{bin.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {listings.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
               Энэ компанид бүртгэлтэй зар олдсонгүй.
@@ -286,11 +353,10 @@ export default function Company() {
                   className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
                 >
                   <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-                    <div>
-                      <h3 className="text-lg font-semibold text-navy-900">{item.titleLabel}</h3>
-                      <p className="mt-2 text-xs text-slate-500">{item.location || "Байршил тодорхойгүй"}</p>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <div>
+                    <h3 className="text-lg font-semibold text-navy-900">{item.titleLabel}</h3>
+                  </div>
+                    <div className="flex h-24 w-56 flex-col justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                       <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Цалин</p>
                       <p className="mt-1 text-base font-semibold text-navy-900">
                         {item.salaryMin || item.salaryMax

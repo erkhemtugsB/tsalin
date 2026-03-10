@@ -1,5 +1,7 @@
 import { Link, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
+import Company from "./pages/Company";
+import Info from "./pages/Info";
 import Privacy from "./pages/Privacy";
 import Share from "./pages/Share";
 
@@ -17,6 +19,9 @@ export default function App() {
             <Link to="/" className="hover:opacity-80">
               Нүүр
             </Link>
+            <Link to="/info" className="hover:opacity-80">
+              Ажлын мэдээлэл
+            </Link>
             <Link to="/privacy" className="hover:opacity-80">
               Нууцлал
             </Link>
@@ -27,6 +32,8 @@ export default function App() {
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/info" element={<Info />} />
+          <Route path="/company/:companyName" element={<Company />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/share" element={<Share />} />
         </Routes>

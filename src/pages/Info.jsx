@@ -649,16 +649,11 @@ export default function Info() {
                   <div>
                     <h3 className="text-lg font-bold text-navy-900">{company.company}</h3>
                     <p className="mt-1 text-sm text-slate-600">{company.count} ажлын байр</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {company.roles.map((role) => (
-                        <span
-                          key={role}
-                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600"
-                        >
-                          {role}
-                        </span>
-                      ))}
-                    </div>
+                    {company.roles.length > 0 && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Онцлох албан тушаал: <span className="font-semibold text-slate-700">{company.roles[0]}</span>
+                      </p>
+                    )}
                   </div>
                   <div className="flex h-24 w-56 flex-col justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Цалингийн хүрээ</p>

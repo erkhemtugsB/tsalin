@@ -43,6 +43,66 @@ function StarRating({ value, label }) {
   );
 }
 
+function ReviewStars({ value }) {
+  const fullStars = Math.round(value);
+  return (
+    <div className="flex items-center gap-1 text-amber-500">
+      {Array.from({ length: 5 }).map((_, idx) => (
+        <svg
+          key={idx}
+          aria-hidden="true"
+          className={`h-3.5 w-3.5 ${idx < fullStars ? "opacity-100" : "opacity-25"}`}
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path d="M12 17.3l-6.18 3.73 1.64-7.19L2 9.24l7.27-.62L12 2l2.73 6.62 7.27.62-5.46 4.6 1.64 7.19z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+function StarPicker({ value, onChange }) {
+  return (
+    <div className="flex items-center gap-1 text-amber-500">
+      {Array.from({ length: 5 }).map((_, idx) => {
+        const base = idx + 1;
+        const fill = value >= base ? 100 : 0;
+        return (
+          <div key={base} className="relative h-7 w-7">
+            <svg
+              aria-hidden="true"
+              className="h-7 w-7 opacity-30"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M12 17.3l-6.18 3.73 1.64-7.19L2 9.24l7.27-.62L12 2l2.73 6.62 7.27.62-5.46 4.6 1.64 7.19z" />
+            </svg>
+            <div className="absolute inset-0 flex">
+              <button
+                type="button"
+                className="h-full w-full"
+                onClick={() => onChange(base)}
+                aria-label={`${base} stars`}
+              />
+            </div>
+            <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ width: `${fill}%` }}>
+              <svg
+                aria-hidden="true"
+                className="h-7 w-7"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M12 17.3l-6.18 3.73 1.64-7.19L2 9.24l7.27-.62L12 2l2.73 6.62 7.27.62-5.46 4.6 1.64 7.19z" />
+              </svg>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Company() {
   const { companyName } = useParams();
   const decodedCompany = companyName ? decodeURIComponent(companyName) : "";
@@ -54,8 +114,13 @@ export default function Company() {
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
-  const [reviewsCount, setReviewsCount] = useState(null);
   const [debugCount, setDebugCount] = useState(null);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewName, setReviewName] = useState("");
+  const [reviewMessage, setReviewMessage] = useState("");
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSubmitError, setReviewSubmitError] = useState("");
 
   useEffect(() => {
     if (!supabase) {
@@ -122,13 +187,11 @@ export default function Company() {
           throw fetchError;
         }
         setReviews(data || []);
-        setReviewsCount((data || []).length);
       })
       .catch((err) => {
         if (!active) return;
         setReviewsError(err?.message || "Сэтгэгдэл татахад алдаа гарлаа.");
         setReviews([]);
-        setReviewsCount(null);
       })
       .finally(() => {
         if (active) {
@@ -183,6 +246,64 @@ export default function Company() {
       count: reviews.length
     };
   }, [reviews]);
+
+  const handleSubmitReview = async (event) => {
+    event.preventDefault();
+    if (!supabase) {
+      setReviewSubmitError("Supabase тохируулаагүй байна.");
+      return;
+    }
+    if (!decodedCompany) {
+      setReviewSubmitError("Компанийн нэр олдсонгүй.");
+      return;
+    }
+    if (!reviewMessage.trim()) {
+      setReviewSubmitError("Сэтгэгдэл бичнэ үү.");
+      return;
+    }
+    if (!reviewRating) {
+      setReviewSubmitError("Үнэлгээ сонгоно уу.");
+      return;
+    }
+    if (reviewName.trim().length > 15) {
+      setReviewSubmitError("Нэр 15 тэмдэгтээс ихгүй байна.");
+      return;
+    }
+    if (reviewMessage.trim().length > 150) {
+      setReviewSubmitError("Сэтгэгдэл 150 тэмдэгтээс ихгүй байна.");
+      return;
+    }
+
+    setReviewSubmitting(true);
+    setReviewSubmitError("");
+
+    const payload = {
+      name: reviewName.trim() || "Anonymous",
+      message: reviewMessage.trim(),
+      rating: reviewRating,
+      company_name: decodedCompany,
+    };
+
+    const { data, error: insertError } = await supabase
+      .from("review")
+      .insert(payload)
+      .select("id, name, message, rating, created_at");
+
+    if (insertError) {
+      setReviewSubmitError(insertError.message || "Сэтгэгдэл илгээхэд алдаа гарлаа.");
+      setReviewSubmitting(false);
+      return;
+    }
+
+    if (data && data[0]) {
+      setReviews((prev) => [data[0], ...prev]);
+    }
+    setReviewName("");
+    setReviewMessage("");
+    setReviewRating(0);
+    setReviewSubmitting(false);
+    setReviewModalOpen(false);
+  };
 
   const salaryBins = useMemo(() => {
     const values = listings
@@ -264,39 +385,61 @@ export default function Company() {
             <p className="text-xs text-slate-400">Debug: {debugCount} бичлэг олдлоо.</p>
           )}
 
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-[1fr,2fr]">
+            <div className="rounded-2xl border border-white/60 bg-gradient-to-br from-white via-amber-50 to-amber-100/70 p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Үнэлгээ</p>
-              <div className="mt-2">
-                <StarRating value={reviewStats.avgRating} label={`${reviewStats.count} review`} />
+              <div className="mt-3 flex items-center gap-3">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-2xl font-bold text-navy-900 shadow-sm">
+                  {reviewStats.avgRating.toFixed(1)}
+                </div>
+                <div>
+                  <StarRating value={reviewStats.avgRating} label={`${reviewStats.count} review`} />
+                  <p className="mt-1 text-xs text-slate-500">Дундаж үнэлгээ</p>
+                </div>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Дундаж: {reviewStats.avgRating.toFixed(1)} / 5
-              </p>
             </div>
-            <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Сэтгэгдэл</p>
+            <div className="rounded-2xl border border-white/60 bg-white/90 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Сэтгэгдэл</p>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">
+                    {reviewStats.count} нийт
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReviewModalOpen(true)}
+                    className="rounded-full bg-navy-900 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-navy-800"
+                  >
+                    Сэтгэгдэл нэмэх
+                  </button>
+                </div>
+              </div>
               {reviewsLoading ? (
-                <p className="mt-2 text-sm text-slate-500">Сэтгэгдэл татаж байна...</p>
+                <p className="mt-3 text-sm text-slate-500">Сэтгэгдэл татаж байна...</p>
               ) : reviewsError ? (
-                <p className="mt-2 text-sm text-rose-600">{reviewsError}</p>
+                <p className="mt-3 text-sm text-rose-600">{reviewsError}</p>
               ) : reviews.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">Одоогоор сэтгэгдэл алга.</p>
+                <p className="mt-3 text-sm text-slate-500">Одоогоор сэтгэгдэл алга.</p>
               ) : (
-                <div className="mt-3 space-y-3">
+                <div className="mt-4 space-y-3">
                   {reviews.slice(0, 3).map((review) => (
-                    <div key={review.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>{review.name || "Anonymous"}</span>
-                        <span>{new Date(review.created_at).toLocaleDateString("en-CA")}</span>
+                    <div key={review.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
+                            {(review.name || "A")[0]}
+                          </span>
+                          <span className="font-semibold text-slate-700">{review.name || "Anonymous"}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <ReviewStars value={Number(review.rating) || 0} />
+                          <span>{new Date(review.created_at).toLocaleDateString("en-CA")}</span>
+                        </div>
                       </div>
                       <p className="mt-2 text-sm text-slate-700">{review.message || "—"}</p>
                     </div>
                   ))}
                 </div>
-              )}
-              {reviewsCount !== null && (
-                <p className="mt-2 text-xs text-slate-400">Debug: {decodedCompany} / {reviewsCount} review</p>
               )}
             </div>
           </div>
@@ -345,6 +488,79 @@ export default function Company() {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {reviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-6">
+          <div className="w-full max-w-lg rounded-2xl border border-white/30 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Сэтгэгдэл нэмэх</p>
+                <h2 className="mt-2 text-xl font-bold text-navy-900">{decodedCompany}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReviewModalOpen(false)}
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:bg-slate-50"
+              >
+                Хаах
+              </button>
+            </div>
+            <form className="mt-5 space-y-4" onSubmit={handleSubmitReview}>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Нэр
+                <input
+                  value={reviewName}
+                  onChange={(event) => setReviewName(event.target.value)}
+                  maxLength={15}
+                  placeholder="Нэр (заавал биш)"
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-400"
+                />
+                <span className="mt-1 block text-[11px] text-slate-400">{reviewName.length}/15</span>
+              </label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Үнэлгээ
+                <div className="mt-2 flex items-center gap-3">
+                  <StarPicker value={reviewRating} onChange={setReviewRating} />
+                  <span className="text-sm font-semibold text-navy-900">{reviewRating.toFixed(1)}</span>
+                </div>
+              </label>
+              <label className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Сэтгэгдэл
+                <textarea
+                  value={reviewMessage}
+                  onChange={(event) => setReviewMessage(event.target.value)}
+                  placeholder="Сэтгэгдлээ бичнэ үү"
+                  rows={4}
+                  maxLength={150}
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-navy-400"
+                />
+                <span className="mt-1 block text-[11px] text-slate-400">{reviewMessage.length}/150</span>
+              </label>
+              {reviewSubmitError && (
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+                  {reviewSubmitError}
+                </p>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReviewModalOpen(false)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Болих
+                </button>
+                <button
+                  type="submit"
+                  disabled={reviewSubmitting}
+                  className="rounded-full bg-navy-900 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-800 disabled:opacity-60"
+                >
+                  {reviewSubmitting ? "Илгээж байна..." : "Илгээх"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </section>

@@ -21,29 +21,6 @@ function parseSalaryValue(raw) {
   return Number.isFinite(value) ? value : null;
 }
 
-function StarRating({ value, label }) {
-  const fullStars = Math.round(value);
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1 text-amber-500">
-        {Array.from({ length: 5 }).map((_, idx) => (
-          <svg
-            key={idx}
-            aria-hidden="true"
-            className={`h-4 w-4 ${idx < fullStars ? "opacity-100" : "opacity-30"}`}
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M12 17.3l-6.18 3.73 1.64-7.19L2 9.24l7.27-.62L12 2l2.73 6.62 7.27.62-5.46 4.6 1.64 7.19z" />
-          </svg>
-        ))}
-      </div>
-      <span className="text-sm font-semibold text-navy-900">{value.toFixed(1)}</span>
-      {label && <span className="text-xs text-slate-500">{label}</span>}
-    </div>
-  );
-}
-
 export default function Info() {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("company");
@@ -55,10 +32,6 @@ export default function Info() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [meta, setMeta] = useState({ total: null, filtered: null });
-  const [reviews, setReviews] = useState([]);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-  const [reviewsError, setReviewsError] = useState("");
-
   const requestId = useRef(0);
   const suggestRequestId = useRef(0);
   const trimmedQuery = query.trim();
@@ -146,42 +119,6 @@ export default function Info() {
       clearTimeout(timer);
     };
   }, [trimmedQuery, mode]);
-
-  useEffect(() => {
-    if (!supabase) {
-      return;
-    }
-    let active = true;
-    setReviewsLoading(true);
-    setReviewsError("");
-
-    supabase
-      .from("review")
-      .select("id, name, message, rating, company_name, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5)
-      .then(({ data, error: fetchError }) => {
-        if (!active) return;
-        if (fetchError) {
-          throw fetchError;
-        }
-        setReviews(data || []);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setReviewsError(err?.message || "Сэтгэгдэл татахад алдаа гарлаа.");
-        setReviews([]);
-      })
-      .finally(() => {
-        if (active) {
-          setReviewsLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -369,12 +306,6 @@ export default function Info() {
     };
   }, [listings, companies, meta.filtered]);
 
-  const reviewStats = useMemo(() => {
-    const ratings = reviews.map((r) => Number(r.rating)).filter((v) => Number.isFinite(v));
-    const avg = ratings.length ? ratings.reduce((acc, val) => acc + val, 0) / ratings.length : 0;
-    return { avgRating: avg, count: reviews.length };
-  }, [reviews]);
-
   return (
     <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 shadow-xl">
       <div className="pointer-events-none absolute -left-24 -top-32 h-64 w-64 rounded-full bg-navy-700/10 blur-3xl" />
@@ -397,31 +328,6 @@ export default function Info() {
           />
         </div>
         <p className="mt-3 text-xs text-slate-500">Сүүлийн зарууд дээр тулгуурласан дундаж үзүүлэлт.</p>
-        {mode === "company" && (
-          <div className="mt-4 rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Сэтгэгдэл</p>
-            {reviewsLoading ? (
-              <p className="mt-2 text-sm text-slate-500">Сэтгэгдэл татаж байна...</p>
-            ) : reviewsError ? (
-              <p className="mt-2 text-sm text-rose-600">{reviewsError}</p>
-            ) : reviews.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">Одоогоор сэтгэгдэл алга.</p>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {reviews.map((review) => (
-                  <div key={review.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>{review.name || "Anonymous"}</span>
-                      <span>{new Date(review.created_at).toLocaleDateString("en-CA")}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-700">{review.message || "—"}</p>
-                    <p className="mt-1 text-xs text-slate-500">{review.company_name}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </header>
 
       <div className="relative z-30 mt-6 grid gap-4 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-md md:grid-cols-[2fr,1fr]">

@@ -8,19 +8,6 @@ function normalizeText(value) {
   return (value || "").toString().trim();
 }
 
-function deriveSalaryAvg(min, max) {
-  if (Number.isFinite(min) && Number.isFinite(max)) {
-    return (min + max) / 2;
-  }
-  if (Number.isFinite(min)) {
-    return min;
-  }
-  if (Number.isFinite(max)) {
-    return max;
-  }
-  return null;
-}
-
 function formatSalary(value) {
   if (!Number.isFinite(value)) {
     return "–";
@@ -28,62 +15,32 @@ function formatSalary(value) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
 }
 
-function parseSalaryText(raw) {
-  const text = normalizeText(raw).toLowerCase();
-  if (!text) {
-    return { min: null, max: null, avg: null };
-  }
+function parseSalaryValue(raw) {
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
 
-  if (/(тохиролцоно|negotiable|ярилцана|as per)/.test(text)) {
-    return { min: null, max: null, avg: null };
-  }
-
-  const parseSide = (chunk) => {
-    const million = chunk.match(/(\\d+(?:[.,]\\d+)?)\\s*сая/);
-    const thousand = chunk.match(/(\\d+(?:[.,]\\d+)?)\\s*мянга/);
-    if (million || thousand) {
-      const millionValue = million ? Number(million[1].replace(",", ".")) * 1_000_000 : 0;
-      const thousandValue = thousand ? Number(thousand[1].replace(",", ".")) * 1_000 : 0;
-      const total = millionValue + thousandValue;
-      return Number.isFinite(total) && total > 0 ? total : null;
-    }
-
-    const multiplier = chunk.includes("сая") ? 1_000_000 : chunk.includes("мянга") ? 1_000 : 1;
-    const tokens = chunk.match(/\\d[\\d\\s.,]*/g) || [];
-    for (const token of tokens) {
-      const cleaned = token.replace(/[^\\d.,]/g, "").trim();
-      if (!cleaned) continue;
-      let compact = cleaned.replace(/\\s+/g, "");
-      if (compact.includes(",") && compact.includes(".")) {
-        compact = compact.replace(/,/g, "");
-      } else if (compact.includes(",") && !compact.includes(".")) {
-        const parts = compact.split(",");
-        if (parts[1]?.length <= 2) {
-          compact = `${parts[0]}.${parts[1]}`;
-        } else {
-          compact = compact.replace(/,/g, "");
-        }
-      } else {
-        compact = compact.replace(/,/g, "");
-      }
-      const num = Number(compact);
-      if (Number.isFinite(num)) {
-        return num * multiplier;
-      }
-    }
-    return null;
-  };
-
-  const parts = text.split(/\\s*[-–—]\\s*/g);
-  const values = parts.map(parseSide).filter((v) => Number.isFinite(v));
-
-  if (!values.length) {
-    return { min: null, max: null, avg: null };
-  }
-
-  const min = values.length >= 2 ? Math.min(values[0], values[1]) : values[0];
-  const max = values.length >= 2 ? Math.max(values[0], values[1]) : values[0];
-  return { min, max, avg: deriveSalaryAvg(min, max) };
+function StarRating({ value, label }) {
+  const fullStars = Math.round(value);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 text-amber-500">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          <svg
+            key={idx}
+            aria-hidden="true"
+            className={`h-4 w-4 ${idx < fullStars ? "opacity-100" : "opacity-30"}`}
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M12 17.3l-6.18 3.73 1.64-7.19L2 9.24l7.27-.62L12 2l2.73 6.62 7.27.62-5.46 4.6 1.64 7.19z" />
+          </svg>
+        ))}
+      </div>
+      <span className="text-sm font-semibold text-navy-900">{value.toFixed(1)}</span>
+      {label && <span className="text-xs text-slate-500">{label}</span>}
+    </div>
+  );
 }
 
 export default function Company() {
@@ -94,6 +51,9 @@ export default function Company() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
 
   useEffect(() => {
     if (!supabase) {
@@ -111,10 +71,10 @@ export default function Company() {
     setPage(1);
 
     supabase
-      .from("jobs")
-      .select("job_title, company_name, salary, location, source, job_url, scraped_at", { count: "exact" })
-      .ilike("company_name", decodedCompany)
-      .order("scraped_at", { ascending: false })
+      .from("job")
+      .select("id, job_title, company_name, salary, created_at", { count: "exact" })
+      .eq("company_name", decodedCompany)
+      .order("created_at", { ascending: false })
       .then(({ data, error: fetchError }) => {
         if (!active) return;
         if (fetchError) {
@@ -138,16 +98,54 @@ export default function Company() {
     };
   }, [decodedCompany]);
 
+  useEffect(() => {
+    if (!supabase || !decodedCompany) {
+      setReviews([]);
+      return;
+    }
+    let active = true;
+    setReviewsLoading(true);
+    setReviewsError("");
+
+    supabase
+      .from("review")
+      .select("id, name, message, rating, created_at")
+      .eq("company_name", decodedCompany)
+      .order("created_at", { ascending: false })
+      .then(({ data, error: fetchError }) => {
+        if (!active) return;
+        if (fetchError) {
+          throw fetchError;
+        }
+        setReviews(data || []);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setReviewsError(err?.message || "Сэтгэгдэл татахад алдаа гарлаа.");
+        setReviews([]);
+      })
+      .finally(() => {
+        if (active) {
+          setReviewsLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [decodedCompany]);
+
   const listings = useMemo(() => {
     return rows.map((row) => {
-      const parsed = parseSalaryText(row.salary);
+      const salaryValue = parseSalaryValue(row.salary);
       return {
         ...row,
-        salaryMin: parsed.min,
-        salaryMax: parsed.max,
-        salaryAvg: parsed.avg,
-        salaryLabel: normalizeText(row.salary),
+        salaryMin: salaryValue,
+        salaryMax: salaryValue,
+        salaryAvg: salaryValue,
+        salaryLabel: Number.isFinite(salaryValue) ? formatSalary(salaryValue) : "Мэдээлэлгүй",
         titleLabel: normalizeText(row.job_title) || "Тодорхойгүй зар",
+        created_at: row.created_at
       };
     });
   }, [rows]);
@@ -168,6 +166,15 @@ export default function Company() {
       maxSalary: max,
     };
   }, [listings]);
+
+  const reviewStats = useMemo(() => {
+    const ratings = reviews.map((r) => Number(r.rating)).filter((v) => Number.isFinite(v));
+    const avg = ratings.length ? ratings.reduce((acc, val) => acc + val, 0) / ratings.length : 0;
+    return {
+      avgRating: avg,
+      count: reviews.length
+    };
+  }, [reviews]);
 
   const salaryBins = useMemo(() => {
     const values = listings
@@ -191,38 +198,6 @@ export default function Company() {
     }
     return bins;
   }, [listings]);
-
-  const roleStats = useMemo(() => {
-    const map = new Map();
-    for (const row of listings) {
-      const role = row.titleLabel;
-      if (!map.has(role)) {
-        map.set(role, { role, count: 0, salaryValues: [] });
-      }
-      const entry = map.get(role);
-      entry.count += 1;
-      if (Number.isFinite(row.salaryAvg)) {
-        entry.salaryValues.push(row.salaryAvg);
-      }
-    }
-    const stats = Array.from(map.values()).map((entry) => {
-      const avgSalary = entry.salaryValues.length
-        ? entry.salaryValues.reduce((acc, val) => acc + val, 0) / entry.salaryValues.length
-        : null;
-      return {
-        role: entry.role,
-        count: entry.count,
-        avgSalary,
-      };
-    });
-    stats.sort((a, b) => (b.avgSalary ?? -Infinity) - (a.avgSalary ?? -Infinity));
-    return stats.slice(0, 6);
-  }, [listings]);
-
-  const maxRoleAvg = useMemo(() => {
-    const values = roleStats.map((item) => item.avgSalary).filter((val) => Number.isFinite(val));
-    return values.length ? Math.max(...values) : 0;
-  }, [roleStats]);
 
   const visibleListings = useMemo(() => {
     return listings.slice(0, page * PAGE_SIZE);
@@ -277,69 +252,37 @@ export default function Company() {
             </div>
           </div>
 
-          {roleStats.length > 0 && (
-            <div className="rounded-3xl border border-white/60 bg-white/80 p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Тэргүүлэх албан тушаалууд
-                </h2>
-                <span className="text-xs text-slate-400">Дундаж цалингаар</span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {roleStats.map((item) => {
-                  const width = maxRoleAvg ? Math.round((item.avgSalary || 0) / maxRoleAvg * 100) : 0;
-                  return (
-                    <div key={item.role} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold text-navy-900">{item.role}</span>
-                        <span className="text-slate-600">
-                          {item.avgSalary ? `${formatSalary(item.avgSalary)} ₮` : "–"}
-                        </span>
-                      </div>
-                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white">
-                        <div
-                          className="h-full rounded-full bg-navy-700/80"
-                          style={{ width: `${width}%` }}
-                        />
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">{item.count} зар</p>
-                    </div>
-                  );
-                })}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Үнэлгээ</p>
+              <div className="mt-2">
+                <StarRating value={reviewStats.avgRating} label={`${reviewStats.count} review`} />
               </div>
             </div>
-          )}
-
-          <div className="rounded-3xl border border-white/60 bg-white/80 p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Цалингийн тархалт
-              </h2>
-              <span className="text-xs text-slate-400">Нийт зар</span>
-            </div>
-            {salaryBins.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500">Цалингийн мэдээлэл олдсонгүй.</p>
-            ) : (
-              <div className="mt-4 grid gap-2">
-                {salaryBins.map((bin) => {
-                  const maxCount = Math.max(...salaryBins.map((b) => b.count));
-                  const width = maxCount ? Math.round((bin.count / maxCount) * 100) : 0;
-                  return (
-                    <div key={bin.label} className="flex items-center gap-3">
-                      <span className="w-28 text-xs text-slate-500">{bin.label}</span>
-                      <div className="flex-1 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-2 rounded-full bg-amber-400/80"
-                          style={{ width: `${width}%` }}
-                        />
+            <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Сэтгэгдэл</p>
+              {reviewsLoading ? (
+                <p className="mt-2 text-sm text-slate-500">Сэтгэгдэл татаж байна...</p>
+              ) : reviewsError ? (
+                <p className="mt-2 text-sm text-rose-600">{reviewsError}</p>
+              ) : reviews.length === 0 ? (
+                <p className="mt-2 text-sm text-slate-500">Одоогоор сэтгэгдэл алга.</p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  {reviews.slice(0, 3).map((review) => (
+                    <div key={review.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>{review.name || "Anonymous"}</span>
+                        <span>{new Date(review.created_at).toLocaleDateString("en-CA")}</span>
                       </div>
-                      <span className="w-10 text-right text-xs text-slate-500">{bin.count}</span>
+                      <p className="mt-2 text-sm text-slate-700">{review.message || "—"}</p>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
 
           {listings.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
@@ -355,15 +298,17 @@ export default function Company() {
                   <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
                   <div>
                     <h3 className="text-lg font-semibold text-navy-900">{item.titleLabel}</h3>
+                    {item.created_at && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {new Date(item.created_at).toLocaleDateString("en-CA")}
+                      </p>
+                    )}
                   </div>
                     <div className="flex h-24 w-56 flex-col justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                       <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Цалин</p>
                       <p className="mt-1 text-base font-semibold text-navy-900">
-                        {item.salaryMin || item.salaryMax
-                          ? `${formatSalary(item.salaryMin ?? item.salaryAvg)} - ${formatSalary(item.salaryMax ?? item.salaryAvg)} ₮`
-                          : item.salaryLabel || "Мэдээлэлгүй"}
+                        {Number.isFinite(item.salaryAvg) ? `${formatSalary(item.salaryAvg)} ₮` : "Мэдээлэлгүй"}
                       </p>
-                      <p className="text-xs text-slate-500">Дундаж: {formatSalary(item.salaryAvg)} ₮</p>
                     </div>
                   </div>
                 </article>

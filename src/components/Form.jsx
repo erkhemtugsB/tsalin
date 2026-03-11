@@ -303,13 +303,20 @@ export default function Form({ onCalculated, compact = false }) {
       };
 
       let insertError = null;
-      const { error: firstError } = await supabase.from("jobs").insert(enrichedInsertData);
+      const { error: companyError } = await supabase
+        .from("company")
+        .upsert({ company_name: payload.company }, { onConflict: "company_name" });
+      if (companyError) {
+        insertError = companyError;
+      }
+
+      const { error: firstError } = await supabase.from("job").insert(enrichedInsertData);
 
       if (firstError) {
         // Legacy schema (meta баганагүй) үед үндсэн өгөгдлөөр дахин оролдоно.
         const missingColumn = /column .* does not exist|schema cache/i.test(firstError.message || "");
         if (missingColumn) {
-          const { error: fallbackError } = await supabase.from("jobs").insert(baseInsertData);
+          const { error: fallbackError } = await supabase.from("job").insert(baseInsertData);
           insertError = fallbackError;
         } else {
           insertError = firstError;

@@ -9,19 +9,6 @@ function normalizeText(value) {
   return (value || "").toString().trim();
 }
 
-function deriveSalaryAvg(min, max) {
-  if (Number.isFinite(min) && Number.isFinite(max)) {
-    return (min + max) / 2;
-  }
-  if (Number.isFinite(min)) {
-    return min;
-  }
-  if (Number.isFinite(max)) {
-    return max;
-  }
-  return null;
-}
-
 function formatSalary(value) {
   if (!Number.isFinite(value)) {
     return "–";
@@ -29,62 +16,32 @@ function formatSalary(value) {
   return new Intl.NumberFormat("en-US").format(Math.round(value));
 }
 
-function parseSalaryText(raw) {
-  const text = normalizeText(raw).toLowerCase();
-  if (!text) {
-    return { min: null, max: null, avg: null };
-  }
+function parseSalaryValue(raw) {
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
 
-  if (/(тохиролцоно|negotiable|ярилцана|as per)/.test(text)) {
-    return { min: null, max: null, avg: null };
-  }
-
-  const parseSide = (chunk) => {
-    const million = chunk.match(/(\d+(?:[.,]\d+)?)\s*сая/);
-    const thousand = chunk.match(/(\d+(?:[.,]\d+)?)\s*мянга/);
-    if (million || thousand) {
-      const millionValue = million ? Number(million[1].replace(",", ".")) * 1_000_000 : 0;
-      const thousandValue = thousand ? Number(thousand[1].replace(",", ".")) * 1_000 : 0;
-      const total = millionValue + thousandValue;
-      return Number.isFinite(total) && total > 0 ? total : null;
-    }
-
-    const multiplier = chunk.includes("сая") ? 1_000_000 : chunk.includes("мянга") ? 1_000 : 1;
-    const tokens = chunk.match(/\d[\d\s.,]*/g) || [];
-    for (const token of tokens) {
-      const cleaned = token.replace(/[^\d.,]/g, "").trim();
-      if (!cleaned) continue;
-      let compact = cleaned.replace(/\s+/g, "");
-      if (compact.includes(",") && compact.includes(".")) {
-        compact = compact.replace(/,/g, "");
-      } else if (compact.includes(",") && !compact.includes(".")) {
-        const parts = compact.split(",");
-        if (parts[1]?.length <= 2) {
-          compact = `${parts[0]}.${parts[1]}`;
-        } else {
-          compact = compact.replace(/,/g, "");
-        }
-      } else {
-        compact = compact.replace(/,/g, "");
-      }
-      const num = Number(compact);
-      if (Number.isFinite(num)) {
-        return num * multiplier;
-      }
-    }
-    return null;
-  };
-
-  const parts = text.split(/\s*[-–—]\s*/g);
-  const values = parts.map(parseSide).filter((v) => Number.isFinite(v));
-
-  if (!values.length) {
-    return { min: null, max: null, avg: null };
-  }
-
-  const min = values.length >= 2 ? Math.min(values[0], values[1]) : values[0];
-  const max = values.length >= 2 ? Math.max(values[0], values[1]) : values[0];
-  return { min, max, avg: deriveSalaryAvg(min, max) };
+function StarRating({ value, label }) {
+  const fullStars = Math.round(value);
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 text-amber-500">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          <svg
+            key={idx}
+            aria-hidden="true"
+            className={`h-4 w-4 ${idx < fullStars ? "opacity-100" : "opacity-30"}`}
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M12 17.3l-6.18 3.73 1.64-7.19L2 9.24l7.27-.62L12 2l2.73 6.62 7.27.62-5.46 4.6 1.64 7.19z" />
+          </svg>
+        ))}
+      </div>
+      <span className="text-sm font-semibold text-navy-900">{value.toFixed(1)}</span>
+      {label && <span className="text-xs text-slate-500">{label}</span>}
+    </div>
+  );
 }
 
 export default function Info() {
@@ -98,6 +55,9 @@ export default function Info() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [meta, setMeta] = useState({ total: null, filtered: null });
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
 
   const requestId = useRef(0);
   const suggestRequestId = useRef(0);
@@ -118,10 +78,10 @@ export default function Info() {
 
       try {
         const queryLimit = trimmedQuery ? DEFAULT_LIMIT : DEFAULT_LIMIT;
-        const base = supabase.from("jobs");
+        const base = supabase.from("job");
         let builder = base
-          .select("job_title, company_name, salary, location, source, job_url, scraped_at", { count: "exact" })
-          .order("scraped_at", { ascending: false })
+          .select("id, job_title, company_name, salary, created_at", { count: "exact" })
+          .order("created_at", { ascending: false })
           .limit(queryLimit);
 
         if (trimmedQuery) {
@@ -146,7 +106,7 @@ export default function Info() {
           const merged = data || [];
           const seen = new Set();
           return merged.filter((item) => {
-            const key = item.job_url || `${item.company_name}-${item.job_title}-${item.scraped_at}`;
+            const key = item.id || `${item.company_name}-${item.job_title}-${item.created_at}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
@@ -191,6 +151,42 @@ export default function Info() {
     if (!supabase) {
       return;
     }
+    let active = true;
+    setReviewsLoading(true);
+    setReviewsError("");
+
+    supabase
+      .from("review")
+      .select("id, name, message, rating, company_name, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5)
+      .then(({ data, error: fetchError }) => {
+        if (!active) return;
+        if (fetchError) {
+          throw fetchError;
+        }
+        setReviews(data || []);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setReviewsError(err?.message || "Сэтгэгдэл татахад алдаа гарлаа.");
+        setReviews([]);
+      })
+      .finally(() => {
+        if (active) {
+          setReviewsLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) {
+      return;
+    }
     const keyword = trimmedQuery;
     if (!keyword) {
       setSuggestions([]);
@@ -202,8 +198,9 @@ export default function Info() {
     const timer = setTimeout(async () => {
       try {
         const field = mode === "company" ? "company_name" : "job_title";
+        const source = mode === "company" ? "company" : "job";
         const { data, error: fetchError } = await supabase
-          .from("jobs")
+          .from(source)
           .select(field)
           .ilike(field, `%${keyword}%`)
           .limit(25);
@@ -238,13 +235,13 @@ export default function Info() {
 
   const listings = useMemo(() => {
     return rows.map((row) => {
-      const parsed = parseSalaryText(row.salary);
+      const salaryValue = parseSalaryValue(row.salary);
       return {
         ...row,
-        salaryMin: parsed.min,
-        salaryMax: parsed.max,
-        salaryAvg: parsed.avg,
-        salaryLabel: normalizeText(row.salary),
+        salaryMin: salaryValue,
+        salaryMax: salaryValue,
+        salaryAvg: salaryValue,
+        salaryLabel: Number.isFinite(salaryValue) ? formatSalary(salaryValue) : "Мэдээлэлгүй",
         companyLabel: normalizeText(row.company_name) || "Тодорхойгүй компани",
         titleLabel: normalizeText(row.job_title) || "Тодорхойгүй зар",
       };
@@ -372,6 +369,12 @@ export default function Info() {
     };
   }, [listings, companies, meta.filtered]);
 
+  const reviewStats = useMemo(() => {
+    const ratings = reviews.map((r) => Number(r.rating)).filter((v) => Number.isFinite(v));
+    const avg = ratings.length ? ratings.reduce((acc, val) => acc + val, 0) / ratings.length : 0;
+    return { avgRating: avg, count: reviews.length };
+  }, [reviews]);
+
   return (
     <section className="relative overflow-hidden rounded-3xl border border-white/40 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 shadow-xl">
       <div className="pointer-events-none absolute -left-24 -top-32 h-64 w-64 rounded-full bg-navy-700/10 blur-3xl" />
@@ -394,6 +397,31 @@ export default function Info() {
           />
         </div>
         <p className="mt-3 text-xs text-slate-500">Сүүлийн зарууд дээр тулгуурласан дундаж үзүүлэлт.</p>
+        {mode === "company" && (
+          <div className="mt-4 rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Сэтгэгдэл</p>
+            {reviewsLoading ? (
+              <p className="mt-2 text-sm text-slate-500">Сэтгэгдэл татаж байна...</p>
+            ) : reviewsError ? (
+              <p className="mt-2 text-sm text-rose-600">{reviewsError}</p>
+            ) : reviews.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">Одоогоор сэтгэгдэл алга.</p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {reviews.map((review) => (
+                  <div key={review.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>{review.name || "Anonymous"}</span>
+                      <span>{new Date(review.created_at).toLocaleDateString("en-CA")}</span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-700">{review.message || "—"}</p>
+                    <p className="mt-1 text-xs text-slate-500">{review.company_name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       <div className="relative z-30 mt-6 grid gap-4 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-md md:grid-cols-[2fr,1fr]">
@@ -608,15 +636,17 @@ export default function Info() {
                   <div>
                     <h3 className="text-lg font-bold text-navy-900">{item.titleLabel}</h3>
                     <p className="mt-1 text-sm text-slate-600">{item.companyLabel}</p>
+                    {item.created_at && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {new Date(item.created_at).toLocaleDateString("en-CA")}
+                      </p>
+                    )}
                   </div>
                   <div className="flex h-24 w-56 flex-col justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Цалин</p>
                     <p className="mt-1 text-base font-semibold text-navy-900">
-                      {item.salaryMin || item.salaryMax
-                        ? `${formatSalary(item.salaryMin ?? item.salaryAvg)} - ${formatSalary(item.salaryMax ?? item.salaryAvg)} ₮`
-                        : item.salaryLabel || "Мэдээлэлгүй"}
+                      {Number.isFinite(item.salaryAvg) ? `${formatSalary(item.salaryAvg)} ₮` : "Мэдээлэлгүй"}
                     </p>
-                    <p className="text-xs text-slate-500">Дундаж: {formatSalary(item.salaryAvg)} ₮</p>
                   </div>
                 </div>
               </article>
@@ -656,13 +686,11 @@ export default function Info() {
                     )}
                   </div>
                   <div className="flex h-24 w-56 flex-col justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Цалингийн хүрээ</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Дундаж цалин</p>
                     <p className="mt-1 text-base font-semibold text-navy-900">
-                      {company.salaryMin || company.salaryMax
-                        ? `${formatSalary(company.salaryMin)} - ${formatSalary(company.salaryMax)} ₮`
-                        : "Мэдээлэлгүй"}
+                      {Number.isFinite(company.salaryAvg) ? `${formatSalary(company.salaryAvg)} ₮` : "Мэдээлэлгүй"}
                     </p>
-                    <p className="text-xs text-slate-500">Дундаж: {formatSalary(company.salaryAvg)} ₮</p>
+                    <p className="text-xs text-slate-500">{company.count} зар</p>
                   </div>
                 </div>
               </Link>

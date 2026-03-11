@@ -54,6 +54,8 @@ export default function Company() {
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState("");
+  const [reviewsCount, setReviewsCount] = useState(null);
+  const [debugCount, setDebugCount] = useState(null);
 
   useEffect(() => {
     if (!supabase) {
@@ -73,19 +75,21 @@ export default function Company() {
     supabase
       .from("job")
       .select("id, job_title, company_name, salary, created_at", { count: "exact" })
-      .eq("company_name", decodedCompany)
+      .ilike("company_name", decodedCompany)
       .order("created_at", { ascending: false })
-      .then(({ data, error: fetchError }) => {
+      .then(({ data, error: fetchError, count }) => {
         if (!active) return;
         if (fetchError) {
           throw fetchError;
         }
         setRows(data || []);
+        setDebugCount(Number.isFinite(count) ? count : null);
       })
       .catch((err) => {
         if (!active) return;
         setError(err?.message || "Мэдээлэл татахад алдаа гарлаа.");
         setRows([]);
+        setDebugCount(null);
       })
       .finally(() => {
         if (active) {
@@ -110,7 +114,7 @@ export default function Company() {
     supabase
       .from("review")
       .select("id, name, message, rating, created_at")
-      .eq("company_name", decodedCompany)
+      .ilike("company_name", `%${decodedCompany}%`)
       .order("created_at", { ascending: false })
       .then(({ data, error: fetchError }) => {
         if (!active) return;
@@ -118,11 +122,13 @@ export default function Company() {
           throw fetchError;
         }
         setReviews(data || []);
+        setReviewsCount((data || []).length);
       })
       .catch((err) => {
         if (!active) return;
         setReviewsError(err?.message || "Сэтгэгдэл татахад алдаа гарлаа.");
         setReviews([]);
+        setReviewsCount(null);
       })
       .finally(() => {
         if (active) {
@@ -168,7 +174,9 @@ export default function Company() {
   }, [listings]);
 
   const reviewStats = useMemo(() => {
-    const ratings = reviews.map((r) => Number(r.rating)).filter((v) => Number.isFinite(v));
+    const ratings = reviews
+      .map((r) => Number(r.rating))
+      .filter((v) => Number.isFinite(v) && v > 0);
     const avg = ratings.length ? ratings.reduce((acc, val) => acc + val, 0) / ratings.length : 0;
     return {
       avgRating: avg,
@@ -252,12 +260,19 @@ export default function Company() {
             </div>
           </div>
 
+          {debugCount !== null && (
+            <p className="text-xs text-slate-400">Debug: {debugCount} бичлэг олдлоо.</p>
+          )}
+
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Үнэлгээ</p>
               <div className="mt-2">
                 <StarRating value={reviewStats.avgRating} label={`${reviewStats.count} review`} />
               </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Дундаж: {reviewStats.avgRating.toFixed(1)} / 5
+              </p>
             </div>
             <div className="rounded-2xl border border-white/60 bg-white/80 p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Сэтгэгдэл</p>
@@ -279,6 +294,9 @@ export default function Company() {
                     </div>
                   ))}
                 </div>
+              )}
+              {reviewsCount !== null && (
+                <p className="mt-2 text-xs text-slate-400">Debug: {decodedCompany} / {reviewsCount} review</p>
               )}
             </div>
           </div>
